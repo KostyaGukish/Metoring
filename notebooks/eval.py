@@ -7,10 +7,6 @@ from sklearn.metrics import root_mean_squared_log_error
 from copy import deepcopy
 from prophet import Prophet
 
-import logging
-logging.getLogger("prophet").setLevel(logging.CRITICAL)
-logging.getLogger("cmdstanpy").setLevel(logging.CRITICAL)
-
 
 def my_GridSearchCV(estimator, X, y, param_grid, cv):   
     keys, values = zip(*param_grid.items())
@@ -96,7 +92,7 @@ def my_nested_cv(estimator, X, y, p_grid, inner_splits=5, outer_splits=5, inner_
             pred = model.predict(df)
             pred = pred[["yhat"]]
             pred[pred < 0] = 0
-            
+
         else:
             model.fit(x_train, y_train)
 
