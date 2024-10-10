@@ -6,6 +6,8 @@ from sklearn.metrics import root_mean_squared_log_error
 from copy import deepcopy
 from prophet import Prophet
 from joblib import Parallel, delayed
+from tqdm import tqdm 
+from sklearn.preprocessing import StandardScaler
 
 
 def split_data(data, k, period = "month"):
@@ -60,9 +62,19 @@ def fit_model(estimator, X, y, params, train_index, test_index):
         pred = fit_predict_prophet(model, x_train, y_train, x_test)
 
     else:
+        num_cols = x_train.select_dtypes(include=['number']).columns
+        
+        scaler = StandardScaler()
+        x_train[num_cols] = scaler.fit_transform(x_train[num_cols])
+        x_test[num_cols] = scaler.transform(x_test[num_cols])
+
+        x_train = x_train.drop(columns=["visit_date"])
+        x_test = x_test.drop(columns=["visit_date"])
+
         model.fit(x_train, y_train)
 
         pred = model.predict(x_test)
+        pred[pred < 0] = 0
 
     return root_mean_squared_log_error(y_test, pred)
 
@@ -90,7 +102,7 @@ def my_grid_search_cv(
 
     scores = Parallel(n_jobs=n_jobs)(
         delayed(my_cross_validation)(estimator, X, y, params, n_jobs)
-        for params in permutations_dicts
+        for params in tqdm(permutations_dicts)
     )
 
     return permutations_dicts[np.argmin(scores)]
