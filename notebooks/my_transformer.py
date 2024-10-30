@@ -56,12 +56,11 @@ class MyTransformer(BaseTransformer):
         return row
 
     def get_store_features(self, row):
-        store_id_data = self.data[self.data["store_id"] == row["store_id"]]
-        holiday_flg_data = store_id_data[
-            store_id_data["holiday_flg"] == self.date_info["holiday_flg"]
+        holiday_flg_data = self.holiday_flg_data[
+            self.holiday_flg_data["store_id"] == row["store_id"]
         ]
-        day_of_week_data = store_id_data[
-            store_id_data["day_of_week"] == self.date_info["day_of_week"]
+        day_of_week_data = self.day_of_week_data[
+            self.day_of_week_data["store_id"] == row["store_id"]
         ]
 
         row = self.get_store_column_lag(row, day_of_week_data, "day_of_week")
@@ -99,15 +98,13 @@ class MyTransformer(BaseTransformer):
         area_name = area_genre[0]
         genre_name = area_genre[1]
 
-        area_genre_data = self.data[
-            (self.data["area_name"] == area_name)
-            & (self.data["genre_name"] == genre_name)
+        holiday_flg_data = self.holiday_flg_data[
+            (self.holiday_flg_data["area_name"] == area_name)
+            & (self.holiday_flg_data["genre_name"] == genre_name)
         ]
-        holiday_flg_data = area_genre_data[
-            area_genre_data["holiday_flg"] == self.date_info["holiday_flg"]
-        ]
-        day_of_week_data = area_genre_data[
-            area_genre_data["day_of_week"] == self.date_info["day_of_week"]
+        day_of_week_data = self.day_of_week_data[
+            (self.day_of_week_data["area_name"] == area_name)
+            & (self.day_of_week_data["genre_name"] == genre_name)
         ]
 
         group = self.get_area_genre_column_feature(
@@ -136,12 +133,21 @@ class MyTransformer(BaseTransformer):
 
         X_columns = X.columns
 
+        self.holiday_flg_data = self.data[
+            self.data["holiday_flg"] == self.date_info["holiday_flg"]
+        ]
+        self.day_of_week_data = self.data[
+            self.data["day_of_week"] == self.date_info["day_of_week"]
+        ]
+
         X = X.transform(lambda row: self.get_store_features(row), axis=1)
-        X = X.groupby(by=["area_name", "genre_name"], group_keys=False)[
+        X = X.groupby(by=["area_name", "genre_name"], group_keys=False, observed=False)[
             X_columns
         ].apply(
             lambda group: self.get_area_genre_features(group, area_genre=group.name)
         )
+
+        self.data = pd.concat([self.data, X]).drop_duplicates().reset_index(drop=True)
 
         for c in X.columns:
             col_type = X[c].dtype
@@ -157,7 +163,7 @@ class MyTransformer(BaseTransformer):
     def compute_rolling(self, group, column_name, lag):
         group[column_name] = (
             group[["date", "visitors"]]
-            .rolling(f"{lag}D", on="date", min_periods=1)
+            .rolling(window=f"{lag}D", on="date", min_periods=1)
             .mean()
             .shift()["visitors"]
         )
@@ -169,9 +175,11 @@ class MyTransformer(BaseTransformer):
         is_nan_column_name = f"is_nan_{column_name}"
 
         data_columns = self.data.columns
-        self.data = self.data.groupby(["store_id", column], group_keys=False)[
-            data_columns
-        ].apply(lambda group: self.compute_rolling(group, column_name, lag))
+        self.data = self.data.groupby(
+            ["store_id", column], group_keys=False, observed=False
+        )[data_columns].apply(
+            lambda group: self.compute_rolling(group, column_name, lag)
+        )
 
         self.data[is_nan_column_name] = pd.isna(self.data[column_name]).astype(int)
         self.data[column_name] = self.data[column_name].fillna(0)
@@ -180,7 +188,9 @@ class MyTransformer(BaseTransformer):
 
     def add_area_genre_features(self, lag, column):
         def area_genre_compute_rolling(area_genre_data):
-            area_genre_data_mean = area_genre_data.groupby(by=["date"]).visitors.mean()
+            area_genre_data_mean = area_genre_data.groupby(
+                by=["date"], observed=True
+            ).visitors.mean()
 
             area_genre_data = (
                 area_genre_data.drop(columns=["visitors"])
@@ -189,9 +199,11 @@ class MyTransformer(BaseTransformer):
             )
 
             area_genre_columns = area_genre_data.columns
-            area_genre_data = area_genre_data.groupby(column, group_keys=False)[
-                area_genre_columns
-            ].apply(lambda group: self.compute_rolling(group, column_name, lag))
+            area_genre_data = area_genre_data.groupby(
+                column, group_keys=False, observed=False
+            )[area_genre_columns].apply(
+                lambda group: self.compute_rolling(group, column_name, lag)
+            )
 
             return area_genre_data
 
@@ -200,9 +212,9 @@ class MyTransformer(BaseTransformer):
 
         visitors = self.data[["visitors"]].copy()
         data_columns = self.data.columns
-        self.data = self.data.groupby(["area_name", "genre_name"], group_keys=False)[
-            data_columns
-        ].apply(area_genre_compute_rolling)
+        self.data = self.data.groupby(
+            ["area_name", "genre_name"], group_keys=False, observed=False
+        )[data_columns].apply(area_genre_compute_rolling)
         self.data["visitors"] = visitors["visitors"].values
 
         self.data[is_nan_column_name] = pd.isna(self.data[column_name]).astype(int)

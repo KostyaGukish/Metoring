@@ -1,9 +1,10 @@
 import pandas as pd
-from numpy import np
+import numpy as np
 from copy import deepcopy
 from sktime.split.base import BaseWindowSplitter
 
 TEST_SIZE = 39
+
 
 class MySplitter(BaseWindowSplitter):
     def __init__(self, test_size=TEST_SIZE, fh=None, n_splits=5):
