@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from copy import deepcopy
+
 from sktime.transformations.base import BaseTransformer
 
 
@@ -27,12 +29,25 @@ class MyTransformer(BaseTransformer):
         super().__init__()
 
     def fit(self, X, y=None):
+        X = deepcopy(X)
         self.data = X
 
         if y is not None:
             self.data["visitors"] = y
 
         return self
+    
+    def to_category(self, data):    
+        data = data.deepcopy()   
+        for c in data.columns:
+            col_type = data[c].dtype
+            if (
+                col_type == "object"
+                or col_type.name == "category"
+                or col_type.name == "datetime64[ns]"
+            ):
+                data[c] = data[c].astype("category")
+        return data
 
     def get_store_column_lag(self, row, data, column):
         for lag in self.LAGS:
@@ -117,7 +132,7 @@ class MyTransformer(BaseTransformer):
         return group
 
     def transform(self, X, y=None):
-        cols = X.columns
+        X = deepcopy(X)
         self.date_info = dict()
         self.date_info["date"] = X.iloc[0]["date"]
         self.date_info["day_of_week"] = X.iloc[0]["day_of_week"]
@@ -147,16 +162,9 @@ class MyTransformer(BaseTransformer):
             lambda group: self.get_area_genre_features(group, area_genre=group.name)
         )
 
-        self.data = pd.concat([self.data, X]).drop_duplicates().reset_index(drop=True)
+        X = self.to_category(X)
 
-        for c in X.columns:
-            col_type = X[c].dtype
-            if (
-                col_type == "object"
-                or col_type.name == "category"
-                or col_type.name == "datetime64[ns]"
-            ):
-                X[c] = X[c].astype("category")
+        cols = self.data.drop(columns=["visitors"]).columns
 
         return X[cols]
 
@@ -223,7 +231,7 @@ class MyTransformer(BaseTransformer):
         return
 
     def fit_transform(self, X, y=None):
-        cols = X.columns
+        X = deepcopy(X)
         if self._is_fitted:
             return self.transform(X)
 
@@ -240,14 +248,14 @@ class MyTransformer(BaseTransformer):
                     self.add_store_features(lag, column)
 
             X = self.data.drop(columns=["visitors"])
+            X = self.to_category(X)
 
-            for c in X.columns:
-                col_type = X[c].dtype
-                if (
-                    col_type == "object"
-                    or col_type.name == "category"
-                    or col_type.name == "datetime64[ns]"
-                ):
-                    X[c] = X[c].astype("category")
+            return X
+        
+    def update(self, X, y):
+        temp = deepcopy(X)
+        temp["visitors"] = y
+        self.data = pd.concat([self.data, temp]).reset_index(drop=True)
+        self.data = self.data.drop_duplicates(subset=["store_id", "date"], keep="first")
 
-            return X[cols]
+        return
