@@ -1,6 +1,9 @@
 import numpy as np
 from sklearn.base import BaseEstimator, RegressorMixin
 
+from tqdm import tqdm
+tqdm.pandas()
+
 
 class RecursivePipeline(BaseEstimator, RegressorMixin):
     def __init__(self, pipeline):

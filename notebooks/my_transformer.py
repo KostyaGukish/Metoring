@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from copy import deepcopy
+import copy
 
 from sktime.transformations.base import BaseTransformer
 
@@ -29,22 +29,34 @@ class MyTransformer(BaseTransformer):
         super().__init__()
 
     def fit(self, X, y=None):
-        X = deepcopy(X)
+        X = copy.deepcopy(X)
         self.data = X
 
         if y is not None:
             self.data["visitors"] = y
 
+        for lag in self.LAGS:
+            for column in ["day_of_week", "holiday_flg"]:
+                for type in ["store_id", "area_genre"]:
+                    column_name = f"{type}_{column}_{lag}days_mean"
+                    is_nan_column_name = f"is_nan_{column_name}"
+
+                    self.data.loc[:, [column_name, is_nan_column_name]] = np.nan
+
+        self.data = self.data.sort_values("date").reset_index(drop=True)
+
         return self
     
     def to_category(self, data):    
-        data = data.deepcopy()   
+        data = copy.deepcopy(data)   
         for c in data.columns:
             col_type = data[c].dtype
             if (
                 col_type == "object"
                 or col_type.name == "category"
                 or col_type.name == "datetime64[ns]"
+                or col_type.name == "string"
+                or col_type == "string"
             ):
                 data[c] = data[c].astype("category")
         return data
@@ -132,7 +144,7 @@ class MyTransformer(BaseTransformer):
         return group
 
     def transform(self, X, y=None):
-        X = deepcopy(X)
+        X = copy.deepcopy(X)
         self.date_info = dict()
         self.date_info["date"] = X.iloc[0]["date"]
         self.date_info["day_of_week"] = X.iloc[0]["day_of_week"]
@@ -192,6 +204,8 @@ class MyTransformer(BaseTransformer):
         self.data[is_nan_column_name] = pd.isna(self.data[column_name]).astype(int)
         self.data[column_name] = self.data[column_name].fillna(0)
 
+        self.data = self.data.sort_values("date").reset_index(drop=True)
+
         return
 
     def add_area_genre_features(self, lag, column):
@@ -218,7 +232,7 @@ class MyTransformer(BaseTransformer):
         column_name = f"area_genre_{column}_{lag}days_mean"
         is_nan_column_name = f"is_nan_{column_name}"
 
-        visitors = self.data[["visitors"]].copy()
+        visitors = copy.deepcopy(self.data[["visitors"]])
         data_columns = self.data.columns
         self.data = self.data.groupby(
             ["area_name", "genre_name"], group_keys=False, observed=False
@@ -228,10 +242,12 @@ class MyTransformer(BaseTransformer):
         self.data[is_nan_column_name] = pd.isna(self.data[column_name]).astype(int)
         self.data[column_name] = self.data[column_name].fillna(0)
 
+        self.data = self.data.sort_values("date").reset_index(drop=True)
+
         return
 
     def fit_transform(self, X, y=None):
-        X = deepcopy(X)
+        X = copy.deepcopy(X)
         if self._is_fitted:
             return self.transform(X)
 
@@ -253,9 +269,11 @@ class MyTransformer(BaseTransformer):
             return X
         
     def update(self, X, y):
-        temp = deepcopy(X)
+        temp = copy.deepcopy(X)
         temp["visitors"] = y
         self.data = pd.concat([self.data, temp]).reset_index(drop=True)
         self.data = self.data.drop_duplicates(subset=["store_id", "date"], keep="first")
+        
+        self.data = self.data.sort_values("date").reset_index(drop=True)
 
         return
