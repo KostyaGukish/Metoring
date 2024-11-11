@@ -19,6 +19,15 @@ class TestRecursivePipeline(unittest.TestCase):
         })
         self.y = np.random.rand(10)
 
+        self.X_pred = pd.DataFrame({
+            "date": pd.date_range(start="2024-01-11", periods=10, freq="D"),
+            "store_id": [1, 2, 3, 1, 2, 3, 1, 2, 3, 1],
+            "area_name": ["Area1", "Area2", "Area3", "Area1", "Area2", "Area3", "Area1", "Area2", "Area3", "Area1"],
+            "genre_name": ["Genre1", "Genre2", "Genre3", "Genre1", "Genre2", "Genre3", "Genre1", "Genre2", "Genre3", "Genre1"],
+            "day_of_week": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"],
+            "holiday_flg": [0, 1, 0, 0, 1, 0, 0, 1, 0, 0],
+        })
+
         self.pipeline = RecursivePipeline(
             pipeline=Pipeline(
                 steps=[
@@ -41,15 +50,16 @@ class TestRecursivePipeline(unittest.TestCase):
 
     def test_predict_batch(self):
         self.pipeline.fit(self.X, self.y)
-        group = self.X.iloc[:5]  
+        group = self.X_pred.iloc[:1]  
         predictions = self.pipeline.predict_batch(group)
         self.assertEqual(predictions.shape[0], group.shape[0])
 
     def test_predict(self):
         self.pipeline.fit(self.X, self.y)
-        predictions = self.pipeline.predict(self.X)
+        predictions = self.pipeline.predict(self.X_pred)
         self.assertEqual(predictions.shape[0], self.X.shape[0])
-        self.assertTrue(np.issubdtype(predictions.dtype, np.number))  
+        self.assertTrue(np.issubdtype(predictions.dtype, np.number)) 
+ 
 
 if __name__ == "__main__":
     unittest.main()

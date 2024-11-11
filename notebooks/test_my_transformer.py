@@ -30,7 +30,6 @@ class TestMyTransformer(unittest.TestCase):
         self.transformer.fit(self.data, self.y)
         transformed_data = self.transformer.transform(self.data)
 
-        # self.assertListEqual(list(transformed_data["area_genre_day_of_week_21days_mean"].values), [0, 1, 1.5, 2, 2.5, 0, 6, 6.5, 7, 7.5])
         self.assertIsInstance(transformed_data, pd.DataFrame, "transform should return a DataFrame.")
         self.assertFalse(transformed_data.empty, "Transformed data should not be empty.")
 
