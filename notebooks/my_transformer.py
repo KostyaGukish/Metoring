@@ -48,6 +48,18 @@ class MyTransformer(BaseTransformer):
         return self
     
     def to_category(self, data):    
+        # data = copy.deepcopy(data)   
+        # for c in data.columns:
+        #     col_type = data[c].dtype
+        #     if (
+        #         col_type == "object"
+        #         or col_type.name == "category"
+        #         or col_type.name == "datetime64[ns]"
+        #         or col_type.name == "string"
+        #         or col_type == "string"
+        #     ):
+        #         data[c] = data[c].astype("category")
+
         data = copy.deepcopy(data)   
         for c in data.columns:
             col_type = data[c].dtype
@@ -58,7 +70,9 @@ class MyTransformer(BaseTransformer):
                 or col_type.name == "string"
                 or col_type == "string"
             ):
-                data[c] = data[c].astype("category")
+                data[c] = data[c].astype("string")
+        
+
         return data
 
     def get_store_column_lag(self, row, data, column):
